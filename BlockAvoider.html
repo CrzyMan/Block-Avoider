@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!DOCTYPE HTML>
 
 <html>
     <head>
@@ -26,11 +26,7 @@
             This Browser does not support the Canvas element. Please use a different Browser.
         </canvas>
         
-        <div style="float: left; font-size: 30pt">
-            Time : <d id="time">0</d><br/>
-            Multiplier: <d id="multi">1</d><br/>
-            Score: <d id="score">0</d>
-            
+        <div id="TimeNSuch" style="float: left; font-size: 30pt">
         </div>
         
         <div style="float: right">
@@ -45,6 +41,12 @@
         <script type="text/javascript">
             var canvas = document.getElementById('canvas');
             var ctx = canvas.getContext('2d');
+            
+            var TimeNSuch = document.getElementById('TimeNSuch');
+            var Time = 0;
+            var Multiplier = 0;
+            var Score = 0;
+            setTimeNSuch();
             
             var frameRate = 64;
             
@@ -117,8 +119,27 @@
                 }
             };
             
+            var i_addTimeAndScore = new PauseableInterval(addTimeAndScore, 1000);
+            i_addTimeAndScore.pause();
+            
             function tick(){
                 ctx.clearRect(0,0,canvas.width, canvas.height);
+                
+                // set Background for Multiplier key
+                ctx.save();
+                ctx.fillStyle = "rgba(0,255,0,.5)";
+                ctx.fillRect(0,0,canvas.width, canvas.height/4);
+                ctx.fillStyle = "rgba(255,255,0,.5)";
+                ctx.fillRect(0,canvas.height/4, canvas.width, canvas.height/4);
+                ctx.fillStyle = "rgba(255,0,0,.5)";
+                ctx.fillRect(0, canvas.height/2, canvas.width, canvas.height);
+                ctx.restore();
+                
+                if (mouseBox.y < canvas.height/4) Multiplier=3;
+                else if (mouseBox.y >= canvas.height/2) Multiplier=1;
+                else Multiplier=2;
+                
+                setTimeNSuch();
                 
                 for (var i = Blocks.length-1; i>=0; i--){
                     Blocks[i].update();
@@ -142,6 +163,9 @@
                         
                         if (i_newBox.i != null) i_newBox.pause();
                         else i_newBox.resume();
+                        
+                        if(i_addTimeAndScore.i != null) i_addTimeAndScore.pause();
+                        else i_addTimeAndScore.resume();
                         break;
                 }
             }
@@ -171,7 +195,7 @@
                 } else {
                     i_tick.resume();
                     i_newBox.resume();
-                    
+                    i_addTimeAndScore.resume();
                     return;
                 }
                 
@@ -198,6 +222,7 @@
                 
                 i_tick.pause();
                 i_newBox.pause();
+                i_addTimeAndScore.pause();
                 
                 i_end = new PauseableInterval(explode, 1000/frameRate);
                 i_end.resume();
@@ -212,7 +237,7 @@
                     i_end.pause();
                     i_end = null;
                     i_end = new PauseableInterval(fadeOut, 10);
-                    setTimeout("endFadeEnded = true;",1000);
+                    setTimeout("endFadeEnded = true;",500);
                 }
             }
             
@@ -232,7 +257,28 @@
                     CountDownNumber = 3;
                     CountDownOpacity = 1;
                     endFadeEnded = false;
+                    
+                    ctx.save();
+                    ctx.font = "40pt Calibri";
+                    ctx.fillStyle = "black";
+                    ctx.fillText("Score: "+Score,0,40);
+                    ctx.restore();
+                    
+                    Score = 0;
+                    Time = 0;
+                    Multiplier = 0;
+                    setTimeNSuch();
                 }
+            }
+            
+            function setTimeNSuch(){
+                var str = "Time: " + Time + "<br/>Multiplier: " + Multiplier + "<br/>Score: " + Score;
+                TimeNSuch.innerHTML = str;
+            }
+            
+            function addTimeAndScore(){
+                Time++;
+                Score += Multiplier;
             }
         </script>
     </body>
