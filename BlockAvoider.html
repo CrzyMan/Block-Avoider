@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+
+<html>
+    <head>
+        <title>Block Avoider</title>
+        <style>
+            canvas{
+                border: dashed;
+                background-color: white;
+                float: left;
+            }
+            
+            div.right{
+                float:right;
+                font-size: 30pt;
+            }
+        </style>
+        <script src="vectors.js"></script>
+        <script src="arrays+.js"></script>
+        <script src="pauseableTimeEvents.js"></script>
+        <script src="objects+.js"></script>
+    </head>
+
+    <body style="background-color: lightgray">
+        <canvas id='canvas' width="500" height="500">
+            This Browser does not support the Canvas element. Please use a different Browser.
+        </canvas>
+        
+        <div style="float: left; font-size: 30pt">
+            Time : <d id="time">0</d><br/>
+            Multiplier: <d id="multi">1</d><br/>
+            Score: <d id="score">0</d>
+            
+        </div>
+        
+        <div style="float: right">
+            <h1 style="font-size: 40pt"><u>Avoid The Blocks</u></h1>
+            <d style="font-size: 20pt">
+                Click the 'Start' button and then move<br/> your mouse into the box.<br/><br/>
+                Press 'p' to toggle pause ON and OFF.<br/>
+            </d><br/>
+            <button id="b_start" style="font-size: 20pt" onclick="startGame();">Start</button>
+        </div>
+        
+        <script type="text/javascript">
+            var canvas = document.getElementById('canvas');
+            var ctx = canvas.getContext('2d');
+            
+            var frameRate = 64;
+            
+            var Blocks = [];
+            function Block(){
+                
+                // initialize position and velocity
+                this.pos = new Vector2d();
+                this.vel = new Vector2d();
+                
+                // set height and width of the block
+                this.width = 15 + Math.floor(Math.random() * 35);
+                this.height = 15 + Math.floor(Math.random() * 35);
+                
+                /* */
+                this.pos.x = Math.floor(Math.random() * (canvas.width - this.width));
+                this.pos.y = -this.height;
+                
+                this.vel.y = 2 + Math.floor(Math.random() * 6)
+                /* */
+                
+                
+                this.vel.x = this.vel.x * (32/frameRate);
+                this.vel.y = this.vel.y * (32/frameRate);
+                
+                this.color = {r: Math.floor(Math.random() * 255), g: Math.floor(Math.random() * 255), b: Math.floor(Math.random() * 255)};
+                
+                this.drawMe = function(){
+                    ctx.save();
+                    ctx.fillStyle = "rgb("+this.color.r+","+this.color.g+","+this.color.b+")";
+                    ctx.fillRect(this.pos.x, this.pos.y, this.width, this.height);
+                    ctx.fillStyle = "black";
+                    ctx.strokeRect(this.pos.x, this.pos.y, this.width, this.height);
+                    ctx.restore();
+                }
+                
+                this.update = function(){
+                    this.pos._add(this.vel);
+                    
+                    if (this.pos.x > canvas.width + this.width || this.pos.x < -this.width ||
+                        this.pos.y > canvas.height + this.height || this.pos.y < -this.height){
+                        this.kill();
+                    }
+                    
+                    this.drawMe();
+                }
+                
+                this.kill = function(){
+                    Blocks.splice(Blocks.indexOf(this),1);
+                }
+                
+                Blocks.push(this);
+            }
+            
+            //var i_tick = window.setInterval(tick, 1000/frameRate);
+            var i_tick = new PauseableInterval(tick, 1000/frameRate);
+            i_tick.pause();
+            
+            //var i_newBox = window.setInterval("new Block()", 100)
+            var i_newBox = new PauseableInterval("new Block()", 100);
+            i_newBox.pause();
+            
+            var mouseBox = {
+                x: 0,
+                y: 0,
+                height: 4,
+                width: 4,
+                drawMe: function(){
+                    ctx.fillRect(this.x, this.y, 4, 4);
+                }
+            };
+            
+            function tick(){
+                ctx.clearRect(0,0,canvas.width, canvas.height);
+                
+                for (var i = Blocks.length-1; i>=0; i--){
+                    Blocks[i].update();
+                    if (Blocks[i].intersectsWith(mouseBox)){
+                        endGame(i);
+                        return;
+                    }
+                }
+                
+                mouseBox.drawMe();
+                
+            }
+            
+            document.body.onkeypress = function(e){
+                var code = e.keyCode || e.which;
+                
+                switch (code){
+                    case 112:
+                        if (i_tick.i != null) i_tick.pause();
+                        else i_tick.resume();
+                        
+                        if (i_newBox.i != null) i_newBox.pause();
+                        else i_newBox.resume();
+                        break;
+                }
+            }
+            
+            document.body.onmousemove = function(e){
+                mouseBox.x = e.x - 12 - 2;
+                mouseBox.y = e.y - 12 - 2;
+            }
+            
+            var CountDownNumber = 3;
+            var CountDownOpacity = 1;
+            function startGame(){
+                document.getElementById('b_start').disabled = true;
+                fadeNumber();
+            }
+            
+            function fadeNumber(){
+                ctx.clearRect(0,0,canvas.height, canvas.width);
+                
+                if (CountDownNumber>=0 && CountDownOpacity>=.01){
+                    CountDownOpacity -= 1/100;
+                    setTimeout(fadeNumber, 10);
+                } else if (CountDownNumber >= 0){
+                    CountDownNumber--;
+                    CountDownOpacity = 1;
+                    setTimeout(fadeNumber, 10);
+                } else {
+                    i_tick.resume();
+                    i_newBox.resume();
+                    return;
+                }
+                
+                ctx.save();
+                ctx.fillStyle = "rgba(0,0,0,"+CountDownOpacity+")";
+                ctx.font = "40pt calibri";
+                if (CountDownNumber>0) ctx.fillText(CountDownNumber, canvas.width/2 - 20, canvas.height/2);
+                else ctx.fillText("GO!", canvas.width/2 - 50, canvas.height/2);
+                
+                ctx.restore();
+            }
+            
+            function endGame(index){
+                for (var i = index; i>=0; i--){
+                    Blocks[i].drawMe();
+                }
+                mouseBox.drawMe();
+                
+                i_tick.pause();
+                i_newBox.pause();
+                
+                
+                
+            }
+        </script>
+    </body>
+</html>
