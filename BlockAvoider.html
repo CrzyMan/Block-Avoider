@@ -35,7 +35,15 @@
                 Click the 'Start' button and then move<br/> your mouse into the box.<br/><br/>
                 Press 'p' to toggle pause ON and OFF.<br/>
             </d><br/>
-            <button id="b_start" style="font-size: 20pt" onclick="startGame();">Start</button>
+            <button id="b_start" style="font-size: 20pt" onclick="startGame();">Start</button><br/><br/>
+            End Explosion Velocity Style<br/>
+            <select id="s_endStyles">
+                <option value="norm">Normalized</option>
+                <option value="normDist">Normalized Modified By Distance</option>
+            </select><br/>
+            <button id="b_TrON" onclick="toggleTrails();" disabled="disabled">Turn Explosion Trails On</button>
+            <button id="b_TrOFF" onclick="toggleTrails();">Turn Explosion Trails Off</button>
+            
         </div>
         
         <script type="text/javascript">
@@ -48,7 +56,45 @@
             var Score = 0;
             setTimeNSuch();
             
+            var s_endStyles = document.getElementById('s_endStyles');
+            
+            var Playing = false;
+            
             var frameRate = 64;
+            
+            var TrailsInExplode = true;
+            var b_TrON = document.getElementById('b_TrON');
+            var b_TrOFF = document.getElementById('b_TrOFF');
+            
+            var EndStyles = {
+                norm: function(){
+                    var mMid = new Vector2d(mouseBox.x + 2, mouseBox.y + 2);
+                    for (var i = Blocks.length-1; i>=0; i--){
+                        var b = Blocks[i];
+                        var bMid = new Vector2d(b.pos.x + b.width/2, b.pos.y + b.height/2);
+                        var norm = new Vector2d(bMid.x - mMid.x, bMid.y - mMid.y).norm();
+                        b.vel = new Vector2d(norm.x * 3, norm.y * 3);
+                        b.drawMe();
+                    }
+                },
+                
+                normDist: function(){
+                    var mMid = new Vector2d(mouseBox.x + 2, mouseBox.y + 2);
+                    for (var i = Blocks.length-1; i>=0; i--){
+                        var b = Blocks[i];
+                        var bMid = new Vector2d(b.pos.x + b.width/2, b.pos.y + b.height/2);
+                        var norm = new Vector2d(bMid.x - mMid.x, bMid.y - mMid.y).norm();
+                        var dist = mMid.distanceFrom(bMid);
+                       
+                        // measure distance from corner to center, add distance from mouse to center to get max distance posible
+                        var mD = (new Vector2d(0,-50).distanceFrom(new Vector2d(canvas.width/2, canvas.height/2))) +
+                                 mMid.distanceFrom(new Vector2d(canvas.height/2, canvas.width/2));
+                        
+                        b.vel = new Vector2d(norm.x * 3 * (.95-(dist/mD)), norm.y * 3 * (.95-(dist/mD)));
+                        b.drawMe();
+                    }
+                }
+            };
             
             var Blocks = [];
             function Block(){
@@ -126,14 +172,7 @@
                 ctx.clearRect(0,0,canvas.width, canvas.height);
                 
                 // set Background for Multiplier key
-                ctx.save();
-                ctx.fillStyle = "rgba(0,255,0,.5)";
-                ctx.fillRect(0,0,canvas.width, canvas.height/4);
-                ctx.fillStyle = "rgba(255,255,0,.5)";
-                ctx.fillRect(0,canvas.height/4, canvas.width, canvas.height/4);
-                ctx.fillStyle = "rgba(255,0,0,.5)";
-                ctx.fillRect(0, canvas.height/2, canvas.width, canvas.height);
-                ctx.restore();
+                drawMultiplierKey();
                 
                 if (mouseBox.y < canvas.height/4) Multiplier=3;
                 else if (mouseBox.y >= canvas.height/2) Multiplier=1;
@@ -154,8 +193,8 @@
             }
             
             document.body.onkeypress = function(e){
+                if (!Playing) return;
                 var code = e.keyCode || e.which;
-                
                 switch (code){
                     case 112:
                         if (i_tick.i != null) i_tick.pause();
@@ -196,6 +235,7 @@
                     i_tick.resume();
                     i_newBox.resume();
                     i_addTimeAndScore.resume();
+                    Playing = true;
                     return;
                 }
                 
@@ -208,21 +248,20 @@
                 ctx.restore();
             }
             
-            var i_end;// = new PauseableInterval(explode, 1000/frameRate);
-            //i_end.pause();
+            var i_end;
             
             function endGame(index){
-                for (var i = Blocks.length-1; i>=0; i--){
-                    var b = Blocks[i];
-                    var temp = new Vector2d(b.pos.x+b.width/2 - mouseBox.x+2, b.pos.y+b.height/2 - mouseBox.y+2).norm();
-                    b.vel = new Vector2d(temp.x * 3, temp.y * 3);
-                    b.drawMe();
-                }
+                
+                // pick end style
+                EndStyles[s_endStyles.value]();
+                
                 mouseBox.drawMe();
                 
                 i_tick.pause();
                 i_newBox.pause();
                 i_addTimeAndScore.pause();
+                
+                Playing = false;
                 
                 i_end = new PauseableInterval(explode, 1000/frameRate);
                 i_end.resume();
@@ -230,6 +269,11 @@
             }
             
             function explode(){
+                if (!TrailsInExplode){
+                    ctx.clearRect(0,0,canvas.width, canvas.height);
+                    drawMultiplierKey();
+                }
+                
                 for (var i = Blocks.length-1; i>=0; i--){
                     Blocks[i].update();
                 }
@@ -237,7 +281,9 @@
                     i_end.pause();
                     i_end = null;
                     i_end = new PauseableInterval(fadeOut, 10);
-                    setTimeout("endFadeEnded = true;",500);
+                    endFadeEnded = false;
+                    if (!TrailsInExplode) endFadeEnded = true;
+                    else setTimeout("endFadeEnded = true;",500);
                 }
             }
             
@@ -279,6 +325,26 @@
             function addTimeAndScore(){
                 Time++;
                 Score += Multiplier;
+            }
+            
+            function toggleTrails(){
+                if (TrailsInExplode) TrailsInExplode=false;
+                else TrailsInExplode=true;
+                
+                b_TrON.disabled = TrailsInExplode;
+                b_TrOFF.disabled = !TrailsInExplode;
+            }
+            
+            function drawMultiplierKey(){
+                // set Background for Multiplier key
+                ctx.save();
+                ctx.fillStyle = "rgba(0,255,0,.5)";
+                ctx.fillRect(0,0,canvas.width, canvas.height/4);
+                ctx.fillStyle = "rgba(255,255,0,.5)";
+                ctx.fillRect(0,canvas.height/4, canvas.width, canvas.height/4);
+                ctx.fillStyle = "rgba(255,0,0,.5)";
+                ctx.fillRect(0, canvas.height/2, canvas.width, canvas.height);
+                ctx.restore();
             }
         </script>
     </body>
