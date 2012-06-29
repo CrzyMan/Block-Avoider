@@ -171,6 +171,7 @@
                 } else {
                     i_tick.resume();
                     i_newBox.resume();
+                    
                     return;
                 }
                 
@@ -183,17 +184,55 @@
                 ctx.restore();
             }
             
+            var i_end;// = new PauseableInterval(explode, 1000/frameRate);
+            //i_end.pause();
+            
             function endGame(index){
-                for (var i = index; i>=0; i--){
-                    Blocks[i].drawMe();
+                for (var i = Blocks.length-1; i>=0; i--){
+                    var b = Blocks[i];
+                    var temp = new Vector2d(b.pos.x+b.width/2 - mouseBox.x+2, b.pos.y+b.height/2 - mouseBox.y+2).norm();
+                    b.vel = new Vector2d(temp.x * 3, temp.y * 3);
+                    b.drawMe();
                 }
                 mouseBox.drawMe();
                 
                 i_tick.pause();
                 i_newBox.pause();
                 
+                i_end = new PauseableInterval(explode, 1000/frameRate);
+                i_end.resume();
                 
+            }
+            
+            function explode(){
+                for (var i = Blocks.length-1; i>=0; i--){
+                    Blocks[i].update();
+                }
+                if (Blocks.length == 0){
+                    i_end.pause();
+                    i_end = null;
+                    i_end = new PauseableInterval(fadeOut, 10);
+                    setTimeout("endFadeEnded = true;",1000);
+                }
+            }
+            
+            var endFadeEnded = false;
+            function fadeOut(){
+                ctx.save();
+                ctx.fillStyle= "rgba(255,255,255,0.1)";
+                ctx.fillRect(0,0,canvas.width, canvas.height);
+                ctx.restore();
                 
+                if(endFadeEnded){
+                    i_end.pause();
+                    i_end = null;
+                    ctx.clearRect(0,0,canvas.width, canvas.height);
+                    document.getElementById('b_start').disabled = false;
+                    
+                    CountDownNumber = 3;
+                    CountDownOpacity = 1;
+                    endFadeEnded = false;
+                }
             }
         </script>
     </body>
