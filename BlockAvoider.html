@@ -386,6 +386,13 @@
             function getNameAndAddToData(){
                 
                 var p = prompt("What is you name?")
+                if (!p || !p.split(" ").join("")){
+                    orderAndDisplayGameData();
+                    return;
+                }
+                
+                
+                
                 
                 var player = GameData.getElementByProperty("name", p);
                 
@@ -410,7 +417,7 @@
             function orderAndDisplayGameData(){
                 GameData.orderBy("time", true);
                 GameData.orderBy("score", true);
-                s_leaders.innerHTML = "";
+                if (GameData.db.length > 0) s_leaders.innerHTML = "";
                 for (var i = 0; i < GameData.db.length; i++){
                     s_leaders.innerHTML += "<option>Name: "+GameData.db[i].name+" | Score: "+GameData.db[i].score+" | Time: "+GameData.db[i].time;
                 }
