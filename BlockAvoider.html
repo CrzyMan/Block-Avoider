@@ -19,6 +19,8 @@
         <script src="arrays+.js"></script>
         <script src="pauseableTimeEvents.js"></script>
         <script src="objects+.js"></script>
+        <script src="simpleDatabase.js"></script>
+        
     </head>
 
     <body style="background-color: lightgray">
@@ -26,8 +28,12 @@
             This Browser does not support the Canvas element. Please use a different Browser.
         </canvas>
         
-        <div id="TimeNSuch" style="float: left; font-size: 30pt">
+        <div  style="float: left; font-size: 30pt">
+            <div id="TimeNSuch"></div>
+            <br/><br/>
+            <div id="d_gameStatus"></div>
         </div>
+        
         
         <div style="float: right">
             <h1 style="font-size: 40pt"><u>Avoid The Blocks</u></h1>
@@ -43,12 +49,20 @@
             </select><br/>
             <button id="b_TrON" onclick="toggleTrails();" disabled="disabled">Turn Explosion Trails On</button>
             <button id="b_TrOFF" onclick="toggleTrails();">Turn Explosion Trails Off</button>
+            <br/><br/>
+            <br/>
+            
+            Leaders<br/>
+            <select id="s_leaders">
+                <option value="false">No Leaders Yet</option>
+            </select>
             
         </div>
         
         <script type="text/javascript">
             var canvas = document.getElementById('canvas');
             var ctx = canvas.getContext('2d');
+            var canvasRect = {x: 0, y:0, width: canvas.width, height: canvas.height};
             
             var TimeNSuch = document.getElementById('TimeNSuch');
             var Time = 0;
@@ -58,6 +72,8 @@
             
             var s_endStyles = document.getElementById('s_endStyles');
             
+            var s_leaders = document.getElementById('s_leaders');
+            
             var Playing = false;
             
             var frameRate = 64;
@@ -65,6 +81,11 @@
             var TrailsInExplode = true;
             var b_TrON = document.getElementById('b_TrON');
             var b_TrOFF = document.getElementById('b_TrOFF');
+            
+            var d_gameStatus = document.getElementById('d_gameStatus');
+            
+            // elements: {name, score, time}
+            var GameData = new SimpleDatabase();
             
             var EndStyles = {
                 norm: function(){
@@ -80,17 +101,16 @@
                 
                 normDist: function(){
                     var mMid = new Vector2d(mouseBox.x + 2, mouseBox.y + 2);
+                    // measure distance from corner to center, add distance from mouse to center to get max distance posible
+                    var mD = (new Vector2d(0,-25).distanceFrom(new Vector2d(canvas.width/2, canvas.height/2))) +
+                            mMid.distanceFrom(new Vector2d(canvas.height/2, canvas.width/2));
+                    
                     for (var i = Blocks.length-1; i>=0; i--){
                         var b = Blocks[i];
                         var bMid = new Vector2d(b.pos.x + b.width/2, b.pos.y + b.height/2);
                         var norm = new Vector2d(bMid.x - mMid.x, bMid.y - mMid.y).norm();
                         var dist = mMid.distanceFrom(bMid);
-                       
-                        // measure distance from corner to center, add distance from mouse to center to get max distance posible
-                        var mD = (new Vector2d(0,-50).distanceFrom(new Vector2d(canvas.width/2, canvas.height/2))) +
-                                 mMid.distanceFrom(new Vector2d(canvas.height/2, canvas.width/2));
-                        
-                        b.vel = new Vector2d(norm.x * 3 * (.95-(dist/mD)), norm.y * 3 * (.95-(dist/mD)));
+                        b.vel = new Vector2d(norm.x * 3 * (1-(dist/mD)), norm.y * 3 * (1-(dist/mD)));
                         b.drawMe();
                     }
                 }
@@ -108,7 +128,7 @@
                 this.height = 15 + Math.floor(Math.random() * 35);
                 
                 /* */
-                this.pos.x = Math.floor(Math.random() * (canvas.width - this.width));
+                this.pos.x = -5 + Math.floor(Math.random() * (canvas.width - this.width + 20));
                 this.pos.y = -this.height;
                 
                 this.vel.y = 2 + Math.floor(Math.random() * 6)
@@ -132,8 +152,7 @@
                 this.update = function(){
                     this.pos._add(this.vel);
                     
-                    if (this.pos.x > canvas.width + this.width || this.pos.x < -this.width ||
-                        this.pos.y > canvas.height + this.height || this.pos.y < -this.height){
+                    if (!this.intersectsWith(canvasRect)){
                         this.kill();
                     }
                     
@@ -190,26 +209,42 @@
                 
                 mouseBox.drawMe();
                 
+                // offscreen
+                if (!mouseBox.intersectsWith(canvasRect)){
+                    TogglePause();
+                }
+                
             }
             
-            document.body.onkeypress = function(e){
+            document.onkeypress = function(e){
                 if (!Playing) return;
                 var code = e.keyCode || e.which;
                 switch (code){
                     case 112:
-                        if (i_tick.i != null) i_tick.pause();
-                        else i_tick.resume();
-                        
-                        if (i_newBox.i != null) i_newBox.pause();
-                        else i_newBox.resume();
-                        
-                        if(i_addTimeAndScore.i != null) i_addTimeAndScore.pause();
-                        else i_addTimeAndScore.resume();
+                        TogglePause();
                         break;
                 }
             }
             
-            document.body.onmousemove = function(e){
+            function TogglePause(){
+                // toggle Pause
+                if (i_tick.i != null){
+                    i_tick.pause();
+                    i_newBox.pause();
+                    i_addTimeAndScore.pause();
+                    
+                    d_gameStatus.innerText = "Game Paused";
+                }
+                else{
+                    i_tick.resume();
+                    i_newBox.resume();
+                    i_addTimeAndScore.resume();
+                    
+                    d_gameStatus.innerText = "";
+                }
+            }
+            
+            document.onmousemove = function(e){
                 mouseBox.x = e.x - 12 - 2;
                 mouseBox.y = e.y - 12 - 2;
             }
@@ -282,8 +317,7 @@
                     i_end = null;
                     i_end = new PauseableInterval(fadeOut, 10);
                     endFadeEnded = false;
-                    if (!TrailsInExplode) endFadeEnded = true;
-                    else setTimeout("endFadeEnded = true;",500);
+                    setTimeout("endFadeEnded = true;",500);
                 }
             }
             
@@ -309,6 +343,8 @@
                     ctx.fillStyle = "black";
                     ctx.fillText("Score: "+Score,0,40);
                     ctx.restore();
+                    
+                    getNameAndAddToData();
                     
                     Score = 0;
                     Time = 0;
@@ -346,6 +382,51 @@
                 ctx.fillRect(0, canvas.height/2, canvas.width, canvas.height);
                 ctx.restore();
             }
+            
+            function getNameAndAddToData(){
+                
+                var p = prompt("What is you name?")
+                
+                var player = GameData.getElementByProperty("name", p);
+                
+                if (player){
+                    if (player.score > Score){
+                        var v = confirm("Your score this game is lower than what is in the database.\nWould you like to overwrite your last score?")
+                        if (v){
+                            player.score = Score;
+                            player.time = Time;
+                        }
+                    } else {
+                        player.score = Score;
+                        player.time = Time;
+                    }
+                } else {
+                    GameData.add({name: p, score: Score, time: Time})
+                }
+                
+                orderAndDisplayGameData();
+            }
+            
+            function orderAndDisplayGameData(){
+                GameData.orderBy("time", true);
+                GameData.orderBy("score", true);
+                s_leaders.innerHTML = "";
+                for (var i = 0; i < GameData.db.length; i++){
+                    s_leaders.innerHTML += "<option>Name: "+GameData.db[i].name+" | Score: "+GameData.db[i].score+" | Time: "+GameData.db[i].time;
+                }
+            }
+            
+            
+            /*****************************
+             *    START TESTING AREA     *
+             *****************************/
+            
+            
+            
+            /*****************************
+             *     END TESTING AREA      *
+             *****************************/
+            
         </script>
     </body>
 </html>
